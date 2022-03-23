@@ -19,6 +19,7 @@ limitations under the License.-->
   <!-- This launch file plays a bag file on start and is used for debugging. -->
 
   <!-- ip of the computer on which the bridge is running -->
+  <!-- <arg name="bridge_ip" default="127.0.0.1"/> -->
   <arg name="bridge_ip" default="172.17.0.1"/>
   <!-- ip of the computer, on which the locator software is running -->
   <arg name="locator_ip" default="127.0.0.1"/>
@@ -63,3 +64,4 @@ limitations under the License.-->
   <node pkg="rosbag" type="play" name="player" args="--clock $(arg bag)" required="false"/>
 
 </launch>
+bbZGs3wFsB35

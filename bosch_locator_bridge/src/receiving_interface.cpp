@@ -29,6 +29,7 @@
 ReceivingInterface::ReceivingInterface(const Poco::Net::IPAddress& hostadress, Poco::UInt16 port, ros::NodeHandle& nh)
   : nh_(nh), ccm_socket_(Poco::Net::SocketAddress(hostadress, port))
 {
+  std::cout << "Interface IP address: " << hostadress << ":" << port << std::endl;
   reactor_.addEventHandler(ccm_socket_, Poco::NObserver<ReceivingInterface, Poco::Net::ReadableNotification>(
                                             *this, &ReceivingInterface::onReadEvent));
 }
@@ -50,6 +51,8 @@ void ReceivingInterface::onReadEvent(const Poco::AutoPtr<Poco::Net::ReadableNoti
     if (received_bytes == 0)
     {
       std::cout << "received msg of length 0... Connection closed? \n";
+      printf("This address: %s, peer address: %s\n", ccm_socket_.address().toString().c_str(), ccm_socket_.peerAddress().toString().c_str());
+      printf("Socket status: available: %d, receive timeout: %ld\n", (int)ccm_socket_.available(), ccm_socket_.getReceiveTimeout().totalMicroseconds());
     }
     else
     {
@@ -141,6 +144,61 @@ ClientMapVisualizationInterface::ClientMapVisualizationInterface(const Poco::Net
   publishers_.push_back(nh.advertise<geometry_msgs::PoseStamped>("client_map_visualization/pose", 5));
   publishers_.push_back(nh.advertise<sensor_msgs::PointCloud2>("client_map_visualization/scan", 5));
   publishers_.push_back(nh.advertise<geometry_msgs::PoseArray>("client_map_visualization/path_poses", 5));
+  nh.getParam("trajectory_output_path", output_path);
+}
+
+void ClientMapVisualizationInterface::postProcess() {
+  for (size_t i = 0; i < all_poses.size() - 1; i++) {
+    std::deque<Pose>& pose_que = all_poses[i], &next_que = all_poses[i + 1];
+    if (pose_que.size() < 3) {
+      if (pose_que.size() == 1)
+        continue;
+      Pose last_pose = next_que.front().inverse() * (pose_que.front() * pose_que.back());
+      next_que.insert(next_que.begin() + 1, last_pose);
+      pose_que.pop_back();
+    } else {
+      const Pose next_base_inv = next_que.front().inverse();
+      size_t inv_id = pose_que.size() - 1;
+      double min_distance = (next_base_inv * (pose_que.front() * pose_que[inv_id])).norm2d();
+      for (size_t j = inv_id - 1; j > 0; j--) {
+        Pose abs_pose = pose_que.front() * pose_que[j];
+        double distance = (next_base_inv * abs_pose).norm2d();
+        if (distance < min_distance) {
+          min_distance = distance;
+          inv_id = j;
+        }
+      }
+      for (size_t j = inv_id + 1; j < pose_que.size(); j++) {
+        Pose new_pose = (next_base_inv * (pose_que.front() * pose_que[j]));
+        pose_que[j] = new_pose;
+      }
+      next_que.insert(next_que.begin() + 1, pose_que.begin() + inv_id + 1, pose_que.end());
+      size_t num_to_pop = pose_que.size() - inv_id;
+      for (size_t j = 0; j < num_to_pop; j++)
+        pose_que.pop_back();
+    }
+  }
+}
+
+
+ClientMapVisualizationInterface::~ClientMapVisualizationInterface() {
+  // 你真正需要的是双向链表结构，双向链表支持随机访问，并且插入 删除的复杂度较小，不过个人认为，插入删除复杂度根本不是问题
+  // 逻辑是这样的，每一个链表（除了最后一个）末尾的几个元素都可能是错误选择base的pose，那么只需要：
+  // 如果长度小于3，也即末尾最多只有一个相对pose，那么这个相对pose将被直接放入下一个链表中
+    // 如果长度大于等于3，找到距离下一个链表起始位姿2D距离最近的元素，之后的元素插入下一链表头（从1开始），最近元素删除
+  postProcess();
+  std::fstream file;
+  file.open(output_path, std::ios::out);
+  for (const std::deque<Pose>& pose_array: all_poses) {
+    const Pose& base_pose = pose_array.front();
+    file << base_pose.x << " " << base_pose.y << " " << base_pose.theta << " " << 1 << std::endl;
+    // size_t max_size = pose_array.size() > 3 ? pose_array.size() - 2 : 0; 
+    for (size_t i = 1; i < pose_array.size(); i++) {
+      Pose abs_pose = base_pose * pose_array[i];
+      file << abs_pose.x << " " << abs_pose.y << " " << abs_pose.theta << " " << 0 << std::endl;
+    } 
+  }
+  printf("Trajectory output to path '%s'\n", output_path.c_str());
 }
 
 size_t ClientMapVisualizationInterface::tryToParseData(const std::vector<char>& datagram)
@@ -162,6 +220,25 @@ size_t ClientMapVisualizationInterface::tryToParseData(const std::vector<char>& 
     publishers_[1].publish(pose);
     publishers_[2].publish(scan);
     publishers_[3].publish(path_poses);
+    while (all_poses.size() < path_poses.poses.size()) {
+      all_poses.emplace_back();
+      all_poses.back().emplace_back(Pose());
+    }
+    for (size_t i = 0; i < path_poses.poses.size(); i++) {
+      const geometry_msgs::Pose& single_pose = path_poses.poses[i];
+      Pose& base_pose = all_poses[i].front();
+      base_pose.x = single_pose.position.x;
+      base_pose.y = single_pose.position.y;
+      base_pose.theta = 2.0 * atan2(single_pose.orientation.z, single_pose.orientation.w);
+    }
+    const Pose last_base_pose = all_poses.back().front();
+    // size_t pose_id = all_poses.size() > 1 ? all_poses.size() - 2 : 0;
+    Pose current_pose;
+    current_pose.x = pose.pose.position.x;
+    current_pose.y = pose.pose.position.y;
+    current_pose.theta = 2.0 * atan2(pose.pose.orientation.z, pose.pose.orientation.w);
+    const Pose relative = last_base_pose.inverse() * current_pose;
+    all_poses.back().push_back(relative);
   }
   return bytes_parsed;
 }

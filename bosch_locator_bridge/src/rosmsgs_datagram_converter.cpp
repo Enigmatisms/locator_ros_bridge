@@ -337,7 +337,77 @@ size_t RosMsgsDatagramConverter::convertPose2DSingleDatagram2Message(Poco::Binar
   return 3 * 4;
 }
 
-Poco::Buffer<char> RosMsgsDatagramConverter::convertLaserScan2DataGram(const sensor_msgs::LaserScan& msg,
+
+// Poco::Buffer<char> RosMsgsDatagramConverter::convertLaserScan2DataGram(const sensor_msgs::LaserScan::ConstPtr& msg,
+//                                                                        size_t scan_num)
+// {
+//   // convert the ROS message to a locator ClientSensorLaserDatagram
+//   const size_t resulting_msg_size = 2        // scanNum
+//                                     + 5 * 8  // time_start, uniqueId, duration_beam, duration_scan, duration_rotate
+//                                     + 6 * 4  // numBeams, angleStart, angleEnd, angleInc, minRange, maxRange
+//                                     + 4      // ranges->length
+//                                     + msg->ranges.size() * 4        // ranges->elements
+//                                     + 1                            // hasIntensities
+//                                     + 2 * 4                        // minIntensity, maxIntensity
+//                                     + 4                            // intensities->length
+//                                     + msg->intensities.size() * 4;  // intensities->elements
+
+//   Poco::Buffer<char> buffer(resulting_msg_size);
+//   Poco::MemoryBinaryWriter writer(buffer, Poco::BinaryWriter::StreamByteOrder::LITTLE_ENDIAN_BYTE_ORDER);
+
+//   // scanNum
+//   writer << static_cast<uint16_t>(scan_num);
+//   // time_start
+//   writer << msg->header.stamp.toSec();
+//   // uniqueId
+//   writer << static_cast<uint64_t>(0);
+//   // duration_beam
+//   double duration_beam = static_cast<double>(fabs(msg->time_increment));
+//   writer << duration_beam;
+//   // duration_scan
+//   writer << duration_beam * static_cast<double>(msg->ranges.size());
+//   // duration_rotate (has to be > 0 for motion correction of scans)
+//   writer << static_cast<double>(msg->scan_time >= 1e-5f ? msg->scan_time : 1e-5f);
+//   // numBeams
+//   writer << static_cast<uint32_t>(msg->ranges.size());
+//   // angleStart
+//   writer << static_cast<float>(msg->angle_min);
+//   // angleEnd
+//   writer << static_cast<float>(msg->angle_max);
+//   // angleInc
+//   writer << static_cast<float>(msg->angle_increment);
+//   // minRange
+//   writer << static_cast<float>(msg->range_min);
+//   // maxRange
+//   writer << static_cast<float>(msg->range_max);
+//   // ranges.length
+//   writer << static_cast<uint32_t>(msg->ranges.size());
+//   // ranges.elements
+//   for (const auto r : msg->ranges)
+//   {
+//     writer << static_cast<float>(std::isnan(r) ? -1e4f : clamp_range(r, -1e4f, 1e4f));
+//   }
+//   writer << static_cast<char>(!msg->intensities.empty());
+//   // FIXME intensities ranges not in sensor_msgs/LaserScan. Where to get from?
+//   // minIntensity
+//   writer << static_cast<float>(0.f);
+//   // maxIntensity
+//   writer << static_cast<float>(255.f);
+//   // intensitites.length
+//   writer << static_cast<uint32_t>(msg->intensities.size());
+//   // intensities.elements
+//   for (const auto intensity : msg->intensities)
+//   {
+//     writer << static_cast<float>(intensity);
+//   }
+//   writer.flush();
+
+//   ROS_ERROR_STREAM_COND(resulting_msg_size != buffer.size(), "convertLaserScan2DataGram: message size mismatch!");
+
+//   return buffer;
+// }
+
+Poco::Buffer<char> RosMsgsDatagramConverter::convertLaserScan2DataGram(const sensor_msgs::LaserScan::ConstPtr& msg,
                                                                        size_t scan_num)
 {
   // convert the ROS message to a locator ClientSensorLaserDatagram
@@ -345,11 +415,11 @@ Poco::Buffer<char> RosMsgsDatagramConverter::convertLaserScan2DataGram(const sen
                                     + 5 * 8  // time_start, uniqueId, duration_beam, duration_scan, duration_rotate
                                     + 6 * 4  // numBeams, angleStart, angleEnd, angleInc, minRange, maxRange
                                     + 4      // ranges->length
-                                    + msg.ranges.size() * 4        // ranges->elements
+                                    + msg->ranges.size() * 4        // ranges->elements
                                     + 1                            // hasIntensities
                                     + 2 * 4                        // minIntensity, maxIntensity
                                     + 4                            // intensities->length
-                                    + msg.intensities.size() * 4;  // intensities->elements
+                                    + msg->intensities.size() * 4;  // intensities->elements
 
   Poco::Buffer<char> buffer(resulting_msg_size);
   Poco::MemoryBinaryWriter writer(buffer, Poco::BinaryWriter::StreamByteOrder::LITTLE_ENDIAN_BYTE_ORDER);
@@ -357,45 +427,45 @@ Poco::Buffer<char> RosMsgsDatagramConverter::convertLaserScan2DataGram(const sen
   // scanNum
   writer << static_cast<uint16_t>(scan_num);
   // time_start
-  writer << msg.header.stamp.toSec();
+  writer << msg->header.stamp.toSec();
   // uniqueId
   writer << static_cast<uint64_t>(0);
   // duration_beam
-  double duration_beam = static_cast<double>(fabs(msg.time_increment));
+  double duration_beam = static_cast<double>(fabs(msg->time_increment));
   writer << duration_beam;
   // duration_scan
-  writer << duration_beam * static_cast<double>(msg.ranges.size());
+  writer << duration_beam * static_cast<double>(msg->ranges.size());
   // duration_rotate (has to be > 0 for motion correction of scans)
-  writer << static_cast<double>(msg.scan_time >= 1e-5f ? msg.scan_time : 1e-5f);
+  writer << static_cast<double>(msg->scan_time >= 1e-5f ? msg->scan_time : 1e-5f);
   // numBeams
-  writer << static_cast<uint32_t>(msg.ranges.size());
+  writer << static_cast<uint32_t>(msg->ranges.size());
   // angleStart
-  writer << static_cast<float>(msg.angle_min);
+  writer << static_cast<float>(msg->angle_min);
   // angleEnd
-  writer << static_cast<float>(msg.angle_max);
+  writer << static_cast<float>(msg->angle_max);
   // angleInc
-  writer << static_cast<float>(msg.angle_increment);
+  writer << static_cast<float>(msg->angle_increment);
   // minRange
-  writer << static_cast<float>(msg.range_min);
+  writer << static_cast<float>(msg->range_min);
   // maxRange
-  writer << static_cast<float>(msg.range_max);
+  writer << static_cast<float>(msg->range_max);
   // ranges.length
-  writer << static_cast<uint32_t>(msg.ranges.size());
+  writer << static_cast<uint32_t>(msg->ranges.size());
   // ranges.elements
-  for (const auto r : msg.ranges)
+  for (const auto r : msg->ranges)
   {
     writer << static_cast<float>(std::isnan(r) ? -1e4f : clamp_range(r, -1e4f, 1e4f));
   }
-  writer << static_cast<char>(!msg.intensities.empty());
+  writer << static_cast<char>(!msg->intensities.empty());
   // FIXME intensities ranges not in sensor_msgs/LaserScan. Where to get from?
   // minIntensity
   writer << static_cast<float>(0.f);
   // maxIntensity
-  writer << static_cast<float>(1.f);
+  writer << static_cast<float>(1024.f);
   // intensitites.length
-  writer << static_cast<uint32_t>(msg.intensities.size());
+  writer << static_cast<uint32_t>(msg->intensities.size());
   // intensities.elements
-  for (const auto intensity : msg.intensities)
+  for (const auto intensity : msg->intensities)
   {
     writer << static_cast<float>(intensity);
   }

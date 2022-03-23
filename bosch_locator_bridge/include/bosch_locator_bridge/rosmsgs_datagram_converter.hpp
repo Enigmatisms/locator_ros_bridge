@@ -157,7 +157,7 @@ public:
    * @oaram scan_num The current scan number
    * @return The data shaped into the datagram structure required by the locator
    */
-  static Poco::Buffer<char> convertLaserScan2DataGram(const sensor_msgs::LaserScan& msg, size_t scan_num);
+  static Poco::Buffer<char> convertLaserScan2DataGram(const sensor_msgs::LaserScan::ConstPtr& msg, size_t scan_num);
 
   /**
    * @brief convertOdometry2DataGram Converts a nav_msgs::Odometry message from ros and converts

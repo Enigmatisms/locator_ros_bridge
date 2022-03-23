@@ -17,6 +17,11 @@ find_package(catkin REQUIRED COMPONENTS
 
 find_package(Poco REQUIRED COMPONENTS Foundation Net JSON)
 
+find_package(Eigen3 REQUIRED)
+if(NOT Eigen3_FOUND)
+   message(FATAL_ERROR "Eigen3 not found.")
+endif()
+
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -76,6 +81,7 @@ catkin_package(
 include_directories(
   ${catkin_INCLUDE_DIRS}
   include/${PROJECT_NAME}
+  ${EIGEN3_INCLUDE_DIRS}
 )
 
 add_executable(${PROJECT_NAME}_node

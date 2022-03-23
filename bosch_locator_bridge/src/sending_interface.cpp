@@ -83,8 +83,9 @@ void SendingInterface::sendData(void* data, size_t size)
       if (total_sent == size)
       {
         good_connections.push_back(connections_[i]);
-        ROS_INFO_STREAM_THROTTLE_NAMED(10, std::to_string(size),
-                                       size << " bytes successfully sent via " << connections_[i].address());
+        ROS_INFO_STREAM_THROTTLE_NAMED(1, std::to_string(size),
+                                       size << " bytes successfully sent via " << connections_[i].address() <<
+                                       ", connection avaiable: " << connections_[i].available() << ", connection (" << i << " / " << connections_.size() << ")");
       }
       else
       {
@@ -97,7 +98,7 @@ void SendingInterface::sendData(void* data, size_t size)
     }
     catch (const Poco::IOException& e)
     {
-      ROS_ERROR_STREAM("caught io exception: " << e.name() << "  -  " << e.what());
+      ROS_ERROR_STREAM("caught io exception: " << e.name() << "  -  " << e.what() << ": " << e.message() << ", " << e.code());
     }
   }
   const auto discarded_connections = connections_.size() - good_connections.size();
