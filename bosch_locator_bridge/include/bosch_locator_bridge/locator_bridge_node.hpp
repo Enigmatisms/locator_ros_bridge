@@ -59,8 +59,7 @@ public:
 private:
   bool check_module_versions(const std::unordered_map<std::string, std::pair<int32_t, int32_t>>& module_versions);
 
-  void laser_callback(const sensor_msgs::LaserScan& msg);
-  void laser2_callback(const sensor_msgs::LaserScan& msg);
+  void laser_callback(const sensor_msgs::LaserScan::ConstPtr& msg);
   void odom_callback(const nav_msgs::Odometry& msg);
 
   bool clientConfigGetEntryCb(bosch_locator_bridge::ClientConfigGetEntry::Request& req,

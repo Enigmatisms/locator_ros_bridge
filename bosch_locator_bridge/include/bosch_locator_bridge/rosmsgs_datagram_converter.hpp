@@ -159,7 +159,8 @@ public:
    * @param scan_time Time between scans [seconds], if not specified in scan message
    * @return The data shaped into the datagram structure required by the locator
    */
-  static Poco::Buffer<char> convertLaserScan2DataGram(const sensor_msgs::LaserScan& msg, size_t scan_num, float scan_time = 0.0f);
+
+  static Poco::Buffer<char> convertLaserScan2DataGram(const sensor_msgs::LaserScan::ConstPtr& msg, size_t scan_num);
 
   /**
    * @brief convertOdometry2DataGram Converts a nav_msgs::Odometry message from ros and converts

@@ -19,11 +19,14 @@
 #include <tf2_ros/transform_broadcaster.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
+#include <fstream>
+#include <deque>
 
 #include <Poco/Net/SocketReactor.h>
 #include <Poco/Net/StreamSocket.h>
 #include <Poco/Net/SocketNotification.h>
 #include <Poco/Net/NetException.h>
+#include "transform.hpp"
 
 /**
  * @brief The ReceivingInterface class is the base class for all receiving interfaces, such as
@@ -95,7 +98,13 @@ class ClientMapVisualizationInterface : public ReceivingInterface
 {
 public:
   ClientMapVisualizationInterface(const Poco::Net::IPAddress& hostadress, ros::NodeHandle& nh);
+  ~ClientMapVisualizationInterface();
   size_t tryToParseData(const std::vector<char>& datagram) override;
+
+private:
+  void postProcess();
+  std::string output_path;
+  std::vector<std::deque<Pose>> all_poses;
 };
 
 class ClientRecordingMapInterface : public ReceivingInterface

@@ -127,7 +127,7 @@ void LocatorBridgeNode::init()
     // Create subscriber to laser data
     std::string scan_topic = "";
     nh_.getParam("scan_topic", scan_topic);
-    laser_sub_ = nh_.subscribe(scan_topic, 1, &LocatorBridgeNode::laser_callback, this);
+    laser_sub_ = nh_.subscribe(scan_topic, 4, &LocatorBridgeNode::laser_callback, this);
   }
 
   // Create interface to send binary laser2 data if requested
@@ -195,7 +195,7 @@ bool LocatorBridgeNode::check_module_versions(
   return true;
 }
 
-void LocatorBridgeNode::laser_callback(const sensor_msgs::LaserScan& msg)
+void LocatorBridgeNode::laser_callback(const sensor_msgs::LaserScan::ConstPtr& msg)
 {
   // If scan_time is not set, use timestamp difference to set it.
   float scan_time = 0.0f;
@@ -210,6 +210,7 @@ void LocatorBridgeNode::laser_callback(const sensor_msgs::LaserScan& msg)
 
   Poco::Buffer<char> laserscan_datagram = RosMsgsDatagramConverter::convertLaserScan2DataGram(msg, ++scan_num_, scan_time);
   laser_sending_interface_->sendData(laserscan_datagram.begin(), laserscan_datagram.size());
+  printf("One scan frame arrived, sending %lu data.\n", laserscan_datagram.size());
 }
 
 void LocatorBridgeNode::laser2_callback(const sensor_msgs::LaserScan& msg)
