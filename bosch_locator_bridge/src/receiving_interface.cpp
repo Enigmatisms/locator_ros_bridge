@@ -148,14 +148,18 @@ ClientMapVisualizationInterface::ClientMapVisualizationInterface(const Poco::Net
 }
 
 void ClientMapVisualizationInterface::postProcess() {
+  printf("Post process started.\n");
   for (size_t i = 0; i < all_poses.size() - 1; i++) {
     std::deque<Pose>& pose_que = all_poses[i], &next_que = all_poses[i + 1];
+    std::deque<uint64_t>& now_que = time_stamps[i], &next_stamp_que = time_stamps[i + 1];
     if (pose_que.size() < 3) {
       if (pose_que.size() == 1)
         continue;
       Pose last_pose = next_que.front().inverse() * (pose_que.front() * pose_que.back());
       next_que.insert(next_que.begin() + 1, last_pose);
+      next_stamp_que.insert(next_stamp_que.begin() + 1, now_que.back());
       pose_que.pop_back();
+      now_que.pop_back();
     } else {
       const Pose next_base_inv = next_que.front().inverse();
       size_t inv_id = pose_que.size() - 1;
@@ -173,30 +177,36 @@ void ClientMapVisualizationInterface::postProcess() {
         pose_que[j] = new_pose;
       }
       next_que.insert(next_que.begin() + 1, pose_que.begin() + inv_id + 1, pose_que.end());
+      next_stamp_que.insert(next_stamp_que.begin() + 1, now_que.begin() + inv_id + 1, now_que.end());
       size_t num_to_pop = pose_que.size() - inv_id;
-      for (size_t j = 0; j < num_to_pop; j++)
+      for (size_t j = 0; j < num_to_pop; j++) {
         pose_que.pop_back();
+        now_que.pop_back();
+      }
     }
   }
+  printf("Post process completed.\n");
 }
 
 
 ClientMapVisualizationInterface::~ClientMapVisualizationInterface() {
-  // 你真正需要的是双向链表结构，双向链表支持随机访问，并且插入 删除的复杂度较小，不过个人认为，插入删除复杂度根本不是问题
-  // 逻辑是这样的，每一个链表（除了最后一个）末尾的几个元素都可能是错误选择base的pose，那么只需要：
-  // 如果长度小于3，也即末尾最多只有一个相对pose，那么这个相对pose将被直接放入下一个链表中
-    // 如果长度大于等于3，找到距离下一个链表起始位姿2D距离最近的元素，之后的元素插入下一链表头（从1开始），最近元素删除
-  postProcess();
+  if (all_poses.size() < 3) {
+    printf("Too view valid way points (%lu), exiting...\n", all_poses.size());
+    return;
+  }
+  // postProcess();
   std::fstream file;
   file.open(output_path, std::ios::out);
-  for (const std::deque<Pose>& pose_array: all_poses) {
+  for (size_t id = 0; id < all_poses.size(); id++) {
+    const std::deque<Pose>& pose_array = all_poses[id];
+    const std::deque<uint64_t>& stamp_array = time_stamps[id];
     const Pose& base_pose = pose_array.front();
-    file << base_pose.x << " " << base_pose.y << " " << base_pose.theta << " " << 1 << std::endl;
+    file << stamp_array.front() << " " << base_pose.x << " " << base_pose.y << " " << base_pose.theta << " " << 1 << std::endl;
     // size_t max_size = pose_array.size() > 3 ? pose_array.size() - 2 : 0; 
-    for (size_t i = 1; i < pose_array.size(); i++) {
-      Pose abs_pose = base_pose * pose_array[i];
-      file << abs_pose.x << " " << abs_pose.y << " " << abs_pose.theta << " " << 0 << std::endl;
-    } 
+    // for (size_t i = 1; i < pose_array.size(); i++) {
+    //   Pose abs_pose = base_pose * pose_array[i];
+    //   file << stamp_array[i] << " " << abs_pose.x << " " << abs_pose.y << " " << abs_pose.theta << " " << 0 << std::endl;
+    // } 
   }
   printf("Trajectory output to path '%s'\n", output_path.c_str());
 }
@@ -223,6 +233,8 @@ size_t ClientMapVisualizationInterface::tryToParseData(const std::vector<char>& 
     while (all_poses.size() < path_poses.poses.size()) {
       all_poses.emplace_back();
       all_poses.back().emplace_back(Pose());
+      time_stamps.emplace_back();
+      time_stamps.back().push_back(path_poses.header.stamp.toNSec());
     }
     for (size_t i = 0; i < path_poses.poses.size(); i++) {
       const geometry_msgs::Pose& single_pose = path_poses.poses[i];
@@ -239,6 +251,7 @@ size_t ClientMapVisualizationInterface::tryToParseData(const std::vector<char>& 
     current_pose.theta = 2.0 * atan2(pose.pose.orientation.z, pose.pose.orientation.w);
     const Pose relative = last_base_pose.inverse() * current_pose;
     all_poses.back().push_back(relative);
+    time_stamps.back().push_back(pose.header.stamp.toNSec());
   }
   return bytes_parsed;
 }
@@ -359,6 +372,22 @@ ClientLocalizationPoseInterface::ClientLocalizationPoseInterface(const Poco::Net
   publishers_.push_back(nh.advertise<bosch_locator_bridge::ClientLocalizationPose>("client_localization_pose", 5));
   publishers_.push_back(nh.advertise<geometry_msgs::PoseWithCovarianceStamped>("client_localization_pose/pose", 5));
   publishers_.push_back(nh.advertise<geometry_msgs::PoseStamped>("client_localization_pose/lidar_odo_pose", 5));
+  nh.getParam("loc_output_path", loc_out_path);
+}
+
+ClientLocalizationPoseInterface::~ClientLocalizationPoseInterface() {
+  if (time_stamps.size() < 10) {
+    printf("Too few valid way points (%lu), exiting...\n", time_stamps.size());
+    return;
+  }
+  std::fstream file;
+  file.open(loc_out_path, std::ios::out);
+  for (size_t id = 0; id < time_stamps.size(); id++) {
+    const Pose& pose = all_poses[id];
+    const uint64_t& v = time_stamps[id];
+    file << v << " " << pose.x << " " << pose.y << " " << pose.theta << std::endl;
+  }
+  printf("Trajectory output to path '%s'\n", loc_out_path.c_str());
 }
 
 size_t ClientLocalizationPoseInterface::tryToParseData(const std::vector<char>& datagram)
@@ -383,7 +412,7 @@ size_t ClientLocalizationPoseInterface::tryToParseData(const std::vector<char>& 
   poseWithCov.pose.covariance[7] = covariance[3];
   poseWithCov.pose.covariance[11] = covariance[4];
   poseWithCov.pose.covariance[35] = covariance[5];
-
+  printf("Current pose status: %d\n", client_localization_pose.state);
   if (bytes_parsed > 0)
   {
     // publish
@@ -391,6 +420,17 @@ size_t ClientLocalizationPoseInterface::tryToParseData(const std::vector<char>& 
     publishers_[0].publish(client_localization_pose);
     publishers_[1].publish(poseWithCov);
     publishers_[2].publish(lidar_odo_pose);
+    if (client_localization_pose.state < 0 && initialized == false)
+      return bytes_parsed;
+    if (initialized == false) {     // pose during intialization state will not be recorded
+      initialized = true;
+    }
+    Pose current_pose;
+    current_pose.x = pose.pose.position.x;
+    current_pose.y = pose.pose.position.y;
+    current_pose.theta = 2.0 * atan2(pose.pose.orientation.z, pose.pose.orientation.w);
+    time_stamps.push_back(poseWithCov.header.stamp.toNSec());
+    all_poses.push_back(current_pose);
   }
   return bytes_parsed;
 }

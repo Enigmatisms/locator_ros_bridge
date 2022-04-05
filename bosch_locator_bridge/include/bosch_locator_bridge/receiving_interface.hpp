@@ -105,6 +105,7 @@ private:
   void postProcess();
   std::string output_path;
   std::vector<std::deque<Pose>> all_poses;
+  std::vector<std::deque<uint64_t>> time_stamps;
 };
 
 class ClientRecordingMapInterface : public ReceivingInterface
@@ -139,7 +140,13 @@ class ClientLocalizationPoseInterface : public ReceivingInterface
 {
 public:
   ClientLocalizationPoseInterface(const Poco::Net::IPAddress& hostadress, ros::NodeHandle& nh);
+  ~ClientLocalizationPoseInterface();
   size_t tryToParseData(const std::vector<char>& datagram) override;
+public:
+  std::vector<uint64_t> time_stamps;
+  std::vector<Pose> all_poses;
+  std::string loc_out_path;
+  bool initialized = false;
 };
 
 class ClientGlobalAlignVisualizationInterface : public ReceivingInterface

@@ -33,7 +33,8 @@ limitations under the License.-->
 
   <arg name="scan_topic" default="/scan"/>
   <arg name="odom_topic" default="/odom"/>
-  <arg name="trajectory_output_path" default="/home/llk/slam/trajectories/bosch/b1.txt"/>
+  <arg name="trajectory_output_path" default="/home/llk/slam/trajectories/hfps5_240_0.1/b4.txt"/>
+  <arg name="loc_output_path" default="/home/llk/slam/trajectories/hfps4_240_0.1/loc_2.txt"/>
 
   <node pkg="bosch_locator_bridge" type="node" name="bridge_node" output="screen" required="true">
     <param name="locator_host" value="$(arg locator_ip)" />
@@ -44,6 +45,7 @@ limitations under the License.-->
     <param name="scan_topic" value="$(arg scan_topic)"/>
     <param name="odom_topic" value="$(arg odom_topic)"/>
     <param name="trajectory_output_path" value="$(arg trajectory_output_path)"/>
+    <param name="loc_output_path" value="$(arg loc_output_path)"/>
 
     <!-- lasertype needs to be set to "simple" so that we can send LaserDatagrams
          (instead of using one of the laser drivers built into the locator software) -->
